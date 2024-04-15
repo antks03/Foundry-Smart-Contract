@@ -1,54 +1,48 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
 
-pragma solidity ^0.8.18;
-
+import {MockV3Aggregator} from "../test/mock/MockV3Aggregator.sol";
 import {Script} from "forge-std/Script.sol";
-import {FundMe} from "../src/FundMe.sol";
-import {MockV3Aggregator} from "../test/mocks/MockV3Aggregator.sol";
 
-contract HelperConfig {
-
-    NetworkConfig public = activeNetworkConfig;
+contract HelperConfig is Script {
+    NetworkConfig public activeNetworkConfig;
 
     uint8 public constant DECIMALS = 8;
-    int public constant INITIAL_PRICE = 2000e8;
+    int256 public constant INITIAL_PRICE = 2000e8;
 
-    struct NetworkConfig{
+    struct NetworkConfig {
         address priceFeed;
     }
 
+    event HelperConfig__CreatedMockPriceFeed(address priceFeed);
+
     constructor() {
-        if(block.chainid == 11155111){
+        if (block.chainid == 11155111) {
             activeNetworkConfig = getSepoliaEthConfig();
-        }   
-        else if(block.chainid == 1){
-
-        }
-        else{
-            activeNetworkConfig = getAnvilEthConfig();
+        } else {
+            activeNetworkConfig = getOrCreateAnvilEthConfig();
         }
     }
 
-    function getSepoliaEthConfig() public pure returns (NetworkConfig memory){
-    NetworkConfig memory sepoliaConfig = NetworkConfig({
-        priceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306;
-    });
-    return sepoliaConfig;
+    function getSepoliaEthConfig() public pure returns (NetworkConfig memory sepoliaNetworkConfig) {
+        sepoliaNetworkConfig = NetworkConfig({
+            priceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306 // ETH / USD
+        });
     }
 
-    function getMainnetEthConfig() public pure returns (NetworkConfig memory){
-    NetworkConfig memory ethConfig = NetworkConfig({
-        priceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306;
-    });
-    return ethConfig;
-    }
-
-    function getAnvilEthConfig() public pure returns (NetworkConfig memory){
+    function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory anvilNetworkConfig) {
+        // Check to see if we set an active network config
+        if (activeNetworkConfig.priceFeed != address(0)) {
+            return activeNetworkConfig;
+        }
         vm.startBroadcast();
-        MockV3Aggregator mockPriceFeed = new MockV3Aggregator(DECIMALS, INITIAL_PRICE);
+        MockV3Aggregator mockPriceFeed = new MockV3Aggregator(
+            DECIMALS,
+            INITIAL_PRICE
+        );
         vm.stopBroadcast();
-        NetworkConfig memory anvilConfig = NetworkConfig({priceFeed: address(mockPriceFeed)});
-        return anvilConfig;
-    }
+        emit HelperConfig__CreatedMockPriceFeed(address(mockPriceFeed));
 
+        anvilNetworkConfig = NetworkConfig({priceFeed: address(mockPriceFeed)});
+    }
 }
